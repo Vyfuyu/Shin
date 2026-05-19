@@ -24,7 +24,7 @@ toggleMenuBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 toggleMenuBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 toggleMenuBtn.Text = "MENU"
 toggleMenuBtn.Font = Enum.Font.SourceSansBold
-Instance.new("UICorner", toggleMenuBtn).CornerRadius = UDim.new(0.5, 0) -- Nút hình tròn
+Instance.new("UICorner", toggleMenuBtn).CornerRadius = UDim.new(0.5, 0)
 
 -- 2. KHUNG MENU CHÍNH
 local mainFrame = Instance.new("ScrollingFrame", sgui)
@@ -33,7 +33,231 @@ mainFrame.Position = UDim2.new(0, 70, 0, 10)
 mainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
 mainFrame.Active = true
 mainFrame.Draggable = true
-mainFrame.CanvasSize = UDim2.new(0, 0, 0, 400)
+mainFrame.CanvasSize = UDim2.new(0, 0, 0, 420) -- Tăng một chút không gian chứa
+mainFrame.ScrollBarThickness = 5
+Instance.new("UICorner", mainFrame)
+
+local layout = Instance.new("UIListLayout", mainFrame)
+layout.Padding = UDim.new(0, 5)
+layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+layout.SortOrder = Enum.SortOrder.LayoutOrder
+
+-- Hàm hỗ trợ tạo nút bấm
+local function CreateButton(text, color)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0.9, 0, 0, 35)
+    btn.BackgroundColor3 = color
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.Text = text
+    btn.Font = Enum.Font.SourceSansBold
+    btn.TextSize = 14
+    Instance.new("UICorner", btn)
+    btn.Parent = mainFrame
+    return btn
+end
+
+-- ==========================================
+-- LOGIC CÁC CHỨC NĂNG
+-- ==========================================
+
+-- Ẩn/Hiện Menu
+local menuVisible = true
+toggleMenuBtn.MouseButton1Click:Connect(function()
+    menuVisible = not menuVisible
+    mainFrame.Visible = menuVisible
+    toggleMenuBtn.BackgroundColor3 = menuVisible and Color3.fromRGB(30, 30, 30) or Color3.fromRGB(200, 0, 0)
+end)
+
+-- 1. CHỨC NĂNG FLY (BAY)
+local flyBtn = CreateButton("FLY: OFF", Color3.fromRGB(150, 0, 0))
+local flying = false
+local flySpeed = 50
+local flyBodyVelocity, flyBodyGyro
+local flyConnection
+
+flyBtn.MouseButton1Click:Connect(function()
+    flying = not flying
+    local char = player.Character
+    if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+    
+    if flying then
+        flyBtn.Text = "FLY: ON"
+        flyBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
+        
+        flyBodyVelocity = Instance.new("BodyVelocity", char.HumanoidRootPart)
+        flyBodyVelocity.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+        flyBodyVelocity.Velocity = Vector3.new(0, 0, 0)
+        
+        flyBodyGyro = Instance.new("BodyGyro", char.HumanoidRootPart)
+        flyBodyGyro.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
+        flyBodyGyro.P = 10000
+        
+        char.Humanoid.PlatformStand = true
+        
+        flyConnection = runService.RenderStepped:Connect(function()
+            local cam = workspace.CurrentCamera
+            local moveDir = char.Humanoid.MoveDirection
+            if moveDir.Magnitude > 0 then
+                flyBodyVelocity.Velocity = cam.CFrame.LookVector * (moveDir.Z * -flySpeed) + cam.CFrame.RightVector * (moveDir.X * flySpeed)
+            else
+                flyBodyVelocity.Velocity = Vector3.new(0, 0, 0)
+            end
+            flyBodyGyro.CFrame = cam.CFrame
+        end)
+    else
+        flyBtn.Text = "FLY: OFF"
+        flyBtn.BackgroundColor3 = Color3.fromRGB(150, 0, 0)
+        if flyBodyVelocity then flyBodyVelocity:Destroy() end
+        if flyBodyGyro then flyBodyGyro:Destroy() end
+        if flyConnection then flyConnection:Disconnect() end
+        if char:FindFirstChild("Humanoid") then char.Humanoid.PlatformStand = false end
+    end
+end)
+
+-- 2. CHỨC NĂNG FREEZE (ĐÓNG BĂNG)
+local freezeBtn = CreateButton("FREEZE: OFF", Color3.fromRGB(150, 0, 0))
+local isFrozen = false
+
+freezeBtn.MouseButton1Click:Connect(function()
+    isFrozen = not isFrozen
+    local char = player.Character
+    if char and char:FindFirstChild("HumanoidRootPart") then
+        char.HumanoidRootPart.Anchored = isFrozen
+        freezeBtn.Text = isFrozen and "FREEZE: ON" or "FREEZE: OFF"
+        freezeBtn.BackgroundColor3 = isFrozen and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(150, 0, 0)
+    end
+end)
+
+-- 3. AUTO CLICKER
+local autoClickFrame = Instance.new("Frame", mainFrame)
+autoClickFrame.Size = UDim2.new(0.9, 0, 0, 60)
+autoClickFrame.BackgroundTransparency = 1
+
+local delayInput = Instance.new("TextBox", autoClickFrame)
+delayInput.Size = UDim2.new(1, 0, 0, 25)
+delayInput.Position = UDim2.new(0, 0, 0, 0)
+delayInput.PlaceholderText = "Nhập Delay (VD: 0.1s)"
+delayInput.Text = "0.1"
+delayInput.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+delayInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+Instance.new("UICorner", delayInput)
+
+local autoClickBtn = Instance.new("TextButton", autoClickFrame)
+autoClickBtn.Size = UDim2.new(1, 0, 0, 30)
+autoClickBtn.Position = UDim2.new(0, 0, 0, 30)
+autoClickBtn.BackgroundColor3 = Color3.fromRGB(150, 0, 0)
+autoClickBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+autoClickBtn.Text = "AUTO CLICK: OFF"
+autoClickBtn.Font = Enum.Font.SourceSansBold
+Instance.new("UICorner", autoClickBtn)
+
+local isAutoClicking = false
+
+autoClickBtn.MouseButton1Click:Connect(function()
+    isAutoClicking = not isAutoClicking
+    autoClickBtn.Text = isAutoClicking and "AUTO CLICK: ON" or "AUTO CLICK: OFF"
+    autoClickBtn.BackgroundColor3 = isAutoClicking and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(150, 0, 0)
+    
+    if isAutoClicking then
+        task.spawn(function()
+            while isAutoClicking do
+                local delayTime = tonumber(delayInput.Text) or 0.1
+                virtualUser:ClickButton1(Vector2.new(0, 0))
+                
+                local char = player.Character
+                if char then
+                    local tool = char:FindFirstChildOfClass("Tool")
+                    if tool then tool:Activate() end
+                end
+                task.wait(delayTime)
+            end
+        end)
+    end
+end)
+
+-- 4. ANTI AFK
+local afkBtn = CreateButton("ANTI AFK: OFF", Color3.fromRGB(150, 0, 0))
+local antiAFK = false
+
+afkBtn.MouseButton1Click:Connect(function()
+    antiAFK = not antiAFK
+    afkBtn.Text = antiAFK and "ANTI AFK: ON" or "ANTI AFK: OFF"
+    afkBtn.BackgroundColor3 = antiAFK and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(150, 0, 0)
+end)
+
+player.Idled:Connect(function()
+    if antiAFK then
+        virtualUser:Button2Down(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
+        task.wait(1)
+        virtualUser:Button2Up(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
+    end
+end)
+
+-- 5. FPS BOOST + AUTO CLEAN REALTIME (TỐI ƯU HÓA & XOÁ QUÁI/MÔ HÌNH MỚI SPAM)
+local fpsBtn = CreateButton("FPS BOOST & CLEAR: OFF", Color3.fromRGB(150, 0, 0))
+local fpsBoostActive = false
+local cleanConnection
+
+-- Hàm xử lý tối ưu hóa và xóa các thành phần gây lag trên một đối tượng
+local function OptimizePart(v)
+    if v:IsA("BasePart") then
+        v.Material = Enum.Material.SmoothPlastic
+        v.Reflectance = 0
+        v.CastShadow = false
+    elseif v:IsA("Decal") or v:IsA("Texture") then
+        v:Destroy()
+    elseif v:IsA("ParticleEmitter") or v:IsA("Trail") or v:IsA("Explosion") or v:IsA("Sparkles") then
+        if v:IsA("ParticleEmitter") or v:IsA("Trail") then
+            v.Enabled = false
+        else
+            v:Destroy()
+        end
+    -- KIỂM TRA VÀ XOÁ MÔ HÌNH QUÁI VẬT / NPC KHI SINH RA
+    elseif v:IsA("Model") and v:FindFirstChildOfClass("Humanoid") then
+        -- Loại trừ nhân vật của người chơi để tránh tự xóa chính mình
+        if not game.Players:GetPlayerFromCharacter(v) then
+            task.defer(function()
+                v:Destroy()
+            end)
+        end
+    end
+end
+
+fpsBtn.MouseButton1Click:Connect(function()
+    fpsBoostActive = not fpsBoostActive
+    
+    if fpsBoostActive then
+        fpsBtn.Text = "FPS BOOST & CLEAR: ON"
+        fpsBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
+        
+        -- Cài đặt môi trường ánh sáng tĩnh tối thiểu
+        local lighting = game:GetService("Lighting")
+        lighting.GlobalShadows = false
+        lighting.FogEnd = 9e9
+        
+        -- Quét dọn toàn bộ Map hiện tại lần đầu tiên
+        for _, v in pairs(workspace:GetDescendants()) do
+            OptimizePart(v)
+        end
+        
+        -- LẮNG NGHE REALTIME: Khi có bất kỳ mô hình, quái vật hay hiệu ứng nào vừa sinh ra (Spawn)
+        cleanConnection = workspace.DescendantAdded:Connect(function(descendant)
+            if fpsBoostActive then
+                OptimizePart(descendant)
+            end
+        end)
+    else
+        fpsBtn.Text = "FPS BOOST & CLEAR: OFF"
+        fpsBtn.BackgroundColor3 = Color3.fromRGB(150, 0, 0)
+        
+        if cleanConnection then
+            cleanConnection:Disconnect()
+            cleanConnection = nil
+        end
+    end
+end)
+
+print("Ultimate Custom Menu Professional Loaded!")
 mainFrame.ScrollBarThickness = 5
 Instance.new("UICorner", mainFrame)
 
